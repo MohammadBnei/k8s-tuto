@@ -74,7 +74,22 @@ To delete the deployment :
     kubectl delete deployment kubernetes-bootcamp
 ```
 
+## Let's dive into it
 
+### (Optional) Push images to docker registry
+
+To push images to the registry, you must first log into docker
+```
+    docker login
+```
+It will ask you you username and password, classic
+
+Then you can build the image and push it into the docker registry
+```
+    # Put the correct information when there is a $
+    docker build . -t $DOCKER_USERNAME/$IMAGE_NAME:($TAG) 
+    docker push $DOCKER_USERNAME/$IMAGE_NAME:($TAG) 
+```
 
 
 
