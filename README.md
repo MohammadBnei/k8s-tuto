@@ -91,7 +91,7 @@ Then you can build the image and push it into the docker registry
     docker push $DOCKER_USERNAME/$IMAGE_NAME:($TAG) 
 ```
 
-### Deployment
+### User Deployment
 
 You can use the mohammaddocker/k8s-tuto-user-api for the image if you did not build your own.
 
@@ -127,7 +127,7 @@ A deployment is a set of instruction to a desired state. You can create the user
                       value: $CLIENT_URL
                 ports:
                     - containerPort: $PORT
-                    name: http
+                      name: http
                 resources:
                     limits:
                     memory: 512Mi
@@ -190,17 +190,165 @@ Similarly, let's use helm to install Mongo
     helm install mgo bitnami/mongodb
 ```
 
-Get the password and url
+Get the password and url for later
 ```
     kubectl get secret --namespace default mgo-mongodb -o jsonpath="{.data.mongodb-root-password}" | base64 --decode
 ```
 
-And copy them inside the product deployment, restart it, port forward it, and test it :
+### Product Deployment
+
+Inside the product-deployment.yml, put the following
 ```
-    curl 'http://localhost:3001/api/v1/products' \
-        -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QHRlc3QuY29tIiwiaWF0IjoxNjM5MzQwNTMzLCJleHAiOjE2NDAyMDQ1MzN9.46GGgDsqhKMt0Pa6X5LWMajagWSCY8IioSljbyio8z0' \
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+    name: product
+    labels:
+        app: product
+    spec:
+    replicas: 2
+    selector:
+        matchLabels:
+        app: product
+    template:
+        metadata:
+        labels:
+            app: product
+        spec:
+        containers:
+            - name: product
+            image: mohammaddocker/k8s-tuto-product-api
+            imagePullPolicy: Always
+            env:
+                - name: MONGO_URI
+                  value: mongodb://root:$MONGO_PASSWORD@$MONGO_URI:27017/
+                - name: JWT_KEY
+                  value: your-jwt-key
+                - name: PORT
+                  value: '3000'
+            ports:
+                - containerPort: 3000
+                  name: http
+            resources:
+                limits:
+                memory: 512Mi
+                cpu: "0.5"
+                requests:
+                memory: 512Mi
+                cpu: "0.5"
+```
+
+Apply the file
+```
+    kubectl apply -f product-deployment.yml
+```
+
+Forward the port and test it (you'll need a token from the user-api)
+```
+    kubectl port-forward deployment/product 3001:3000
+    
+    curl -X 'POST' http://localhost:3001/api/v1/products' \
+        -H 'Authorization: Bearer $TOKEN' \
         -H 'Content-Type: application/x-www-form-urlencoded' \
         -H 'accept: application/json' \
         --data-raw 'value=36&name=test&vendorId=1' \
         --compressed | json_pp
 ```
+
+### Payment API
+
+The payment api is special, because it needs to know the network location of the product and user api.
+
+Services are the basic network locator in kubernetes. Let's add one for user and product at the end of each files
+
+```
+    # Inside user-deployment.yml
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+        name: user
+    spec:
+        selector:
+            app: user
+        ports:
+            - protocol: TCP
+            port: 80
+            targetPort: 3000
+
+    # Inside product-deployment.yml
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+        name: product
+    spec:
+        selector:
+            app: product
+        ports:
+            - protocol: TCP
+            port: 80
+            targetPort: 3000
+```
+
+Apply the two modified files
+
+Let's write the payment deployment:
+```
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+    name: payment
+    labels:
+        app: payment
+    spec:
+    replicas: 2
+    selector:
+        matchLabels:
+        app: payment
+    template:
+        metadata:
+        labels:
+            app: payment
+        spec:
+        containers:
+            - name: payment
+            image: mohammaddocker/k8s-tuto-payment-api
+            imagePullPolicy: Always
+            env:
+                - name: MONGO_URI
+                    value: $MONGO_URI
+                - name: JWT_KEY
+                    value: your-jwt-key
+                - name: PORT
+                    value: '3000'
+                # The url is the name of the service for each deployment
+                - name: USER_API_URL
+                    value: http://user/api/v1/
+                - name: PRODUCT_API_URL
+                    value: http://product/api/v1/
+            ports:
+                - containerPort: 3000
+                name: http
+            resources:
+                limits:
+                memory: 512Mi
+                cpu: "0.5"
+                requests:
+                memory: 512Mi
+                cpu: "0.5"
+```
+
+As always, forward the port of the deployment and you can test if everything went alright
+```
+    kubectl port-forward deployment/payment 3002:3000
+
+    curl -X 'POST' 'http://localhost:3002/api/v1/payments' \
+        -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QHRlc3QuY29tIiwiaWF0IjoxNjM5MzQwNTMzLCJleHAiOjE2NDAyMDQ1MzN9.46GGgDsqhKMt0Pa6X5LWMajagWSCY8IioSljbyio8z0' \
+        -H 'Content-Type: application/x-www-form-urlencoded' \
+        -H 'accept: application/json' \
+        --data-raw 'payed=90&buyerId=1&productId=$PRODUCT_ID' \
+        --compressed | json_pp
+```
+
+That's it ! You've succesfully created deployment and service script in kubernetes.
