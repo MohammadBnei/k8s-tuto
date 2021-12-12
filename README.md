@@ -21,7 +21,7 @@ It is not accessible from outside of the cluster by default, so let's instanciat
     kubectl proxy
 ```
 You can access the dashboard now at this address : 
-[http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/](http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/)
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
 
 You can't login yet, you need to create a service account
 ```
@@ -56,3 +56,25 @@ You can't login yet, you need to create a service account
 Copy the token and paste it into the Dashboard login and press "Sign in"
 
 Voila !
+
+## First basic deployment
+
+Your first deployment will be very simple 
+```
+    kubectl create deployment kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1
+```
+
+See on your dashboard the new deployment, and use the url (verify that the ```kubectl proxy``` is still running) to access the pod :
+http://localhost:8001/api/v1/namespaces/default/pods/$POD_NAME
+
+That's it ! If you have an published image on a public registery, you can try to deploy it.
+
+To delete the deployment : 
+```
+    kubectl delete deployment kubernetes-bootcamp
+```
+
+
+
+
+
