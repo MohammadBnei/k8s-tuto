@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment
+  labels:
+    app: payment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment
+  template:
+    metadata:
+      labels:
+        app: payment
+    spec:
+      containers:
+        - name: payment
+          image: mohammaddocker/k8s-tuto-payment-api
+          imagePullPolicy: Always
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: the-map
+                  key: MONGO_URI
+            - name: JWT_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: the-map
+                  key: JWT_KEY
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: the-map
+                  key: PORT
+            - name: USER_API_URL
+              value: http://user/api/v1/
+            - name: PRODUCT_API_URL
+              value: http://product/api/v1/
+          ports:
+            - containerPort: 3000
+              name: http
+          resources:
+            limits:
+              memory: 512Mi
+              cpu: "0.5"
+            requests:
+              memory: 256Mi
+              cpu: "0.2"
